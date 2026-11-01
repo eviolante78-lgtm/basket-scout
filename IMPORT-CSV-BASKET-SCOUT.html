@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Import CSV -> Basket Scout</title>
+<style>
+body{margin:0;background:#0f1115;color:#fff;font-family:system-ui;padding:20px;max-width:700px;margin:0 auto}
+.card{background:#1c212e;border:1px solid #2a303e;border-radius:16px;padding:20px;margin:16px 0}
+.btn{background:#ff6a00;color:#fff;border:0;padding:14px 20px;border-radius:12px;font-weight:900;width:100%;cursor:pointer;margin:8px 0;font-size:15px}
+.btn-secondary{background:#2a303e}
+pre{background:#0f1115;border:1px solid #2a303e;padding:12px;border-radius:8px;overflow:auto;max-height:400px;font-size:12px;white-space:pre-wrap;word-break:break-all}
+h2{color:#ff6a00}
+.success{color:#4ade80} .warn{color:#facc15} .error{color:#f87171}
+table{width:100%;border-collapse:collapse;margin:10px 0}
+th,td{border:1px solid #2a303e;padding:8px;text-align:left;font-size:13px}
+th{background:#2a303e;color:#ff6a00}
+</style>
+</head>
+<body>
+<h1>🏀 Import CSV -> Basket Scout</h1>
+
+<div class="card">
+<h2>Passo 1: Carica CSV</h2>
+<input type="file" id="csvFile" accept=".csv" onchange="loadCSV(event)">
+<p style="font-size:13px;color:#94a3b8">Carica il file CSV che hai recuperato dal vecchio tablet</p>
+<div id="preview"></div>
+</div>
+
+<div class="card">
+<h2>Passo 2: Anteprima conversione</h2>
+<div id="conversionPreview"></div>
+</div>
+
+<div class="card">
+<h2>Passo 3: Importa nell'app</h2>
+<button class="btn" onclick="importIntoApp()">📥 Importa CSV nella nuova app installata</button>
+<div id="importStatus"></div>
+</div>
+
+<div class="card">
+<h2>Formato CSV atteso</h2>
+<p style="font-size:13px">Il CSV deve avere colonne tipo:</p>
+<pre>data,avversario,casa,risultato,stagione,categoria,note
+2025-10-12,Bologna,TRUE,78 - 72,2025/26,U15,Buona partita
+...</pre>
+<p style="font-size:13px;color:#94a3b8">Se il tuo CSV ha formato diverso, caricalo lo stesso - lo analizziamo e convertiamo.</p>
+</div>
+
+<script>
+let parsedData = [];
+let headers = [];
+
+function loadCSV(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const text = e.target.result;
+    parseCSV(text);
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text){
+  // Gestisce sia virgola che punto e virgola
+  const delimiter = text.includes(';') ? ';' : ',';
+  const lines = text.split('\n').filter(l=>l.trim());
+  if(lines.length<2){
+    document.getElementById('preview').innerHTML = '<p class="error">CSV vuoto o formato non riconosciuto</p>';
+    return;
+  }
+  headers = lines[0].split(delimiter).map(h=>h.trim().replace(/^"|"$/g,''));
+  parsedData = [];
+  for(let i=1;i<lines.length;i++){
+    const line = lines[i];
+    // Gestione semplice CSV con virgolette
+    const values = line.split(delimiter).map(v=>v.trim().replace(/^"|"$/g,''));
+    if(values.length===0 || (values.length===1 && !values[0])) continue;
+    const obj = {};
+    headers.forEach((h, idx)=>{
+      obj[h] = values[idx]||'';
+    });
+    parsedData.push(obj);
+  }
+  
+  // Preview
+  let html = '<p class="success">✅ Trovate '+parsedData.length+' righe, colonne: '+headers.join(', ')+'</p>';
+  html += '<table><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
+  for(let i=0;i<Math.min(5, parsedData.length);i++){
+    html += '<tr>'+headers.map(h=>'<td>'+(parsedData[i][h]||'')+'</td>').join('')+'</tr>';
+  }
+  if(parsedData.length>5) html += '<tr><td colspan="'+headers.length+'" style="text-align:center;color:#94a3b8">... e altre '+(parsedData.length-5)+' righe</td></tr>';
+  html += '</table>';
+  document.getElementById('preview').innerHTML = html;
+  
+  // Conversion preview
+  previewConversion();
+}
+
+function previewConversion(){
+  if(parsedData.length===0) return;
+  const games = convertToGames(parsedData);
+  let html = '<p class="success">Convertite '+games.length+' partite nel formato Basket Scout</p>';
+  html += '<pre>'+JSON.stringify(games.slice(0,2), null, 2).substring(0,2000)+(games.length>2?'\n...':'')+'</pre>';
+  document.getElementById('conversionPreview').innerHTML = html;
+}
+
+function convertToGames(data){
+  const games = [];
+  data.forEach((row, idx)=>{
+    // Prova a mappare colonne comuni
+    const get = (keys)=>{
+      for(let k of keys){
+        for(let h of headers){
+          if(h.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(h.toLowerCase())){
+            if(row[h]) return row[h];
+          }
+        }
+        if(row[k]) return row[k];
+      }
+      return '';
+    };
+    
+    const dataStr = get(['data','date','giorno']) || new Date().toISOString().slice(0,10);
+    const avversario = get(['avversario','avversari','squadra','team','opponent']) || 'Avversario '+(idx+1);
+    const casaVal = get(['casa','home','Casa']);
+    const casa = casaVal ? (casaVal.toLowerCase().includes('true') || casaVal==='1' || casaVal.toLowerCase().includes('casa') || casaVal.toLowerCase().includes('si')) : true;
+    const risultato = get(['risultato','result','punteggio','score']) || '00 - 00';
+    const stagione = get(['stagione','season','anno']) || '2025/26';
+    const categoria = get(['categoria','category','cat']) || 'U15';
+    const note = get(['note','notes','commento']) || '';
+    
+    const game = {
+      id: 'g'+Date.now()+'_'+idx,
+      data: dataStr,
+      avversario: avversario,
+      casa: casa,
+      risultato: risultato,
+      plusMinus: 0,
+      categoria: categoria,
+      stagione: stagione,
+      note: note,
+      stats: {
+        falliFatti:0,falliSubiti:0,assist:0,pallePerse:0,palleRecuperate:0,
+        rimbOff:0,rimbDif:0,stoppate:0,t1Tent:0,t1Real:0,t2Tent:0,t2Real:0,t3Tent:0,t3Real:0
+      },
+      intervals: [],
+      periodStats: {},
+      periodScores: {"": risultato},
+      convocati: [],
+      playerStats: {},
+      inCampo: {},
+      quintetti: {},
+      inCampoPerPeriodo: {}
+    };
+    
+    // Calcola plusMinus da risultato
+    try{
+      const m = risultato.match(/(\d+)\s*-\s*(\d+)/);
+      if(m){
+        const us = parseInt(m[1]), them = parseInt(m[2]);
+        game.plusMinus = casa ? (us - them) : (them - us);
+      }
+    }catch(e){}
+    
+    games.push(game);
+  });
+  return games;
+}
+
+function importIntoApp(){
+  if(parsedData.length===0){
+    document.getElementById('importStatus').innerHTML = '<p class="error">❌ Carica prima un CSV</p>';
+    return;
+  }
+  const games = convertToGames(parsedData);
+  try{
+    const raw = localStorage.getItem('basket_scout_data_v1');
+    let current = raw ? JSON.parse(raw) : {};
+    if(!current.games) current.games = [];
+    if(!current.seasons) current.seasons = [];
+    if(!current.players) current.players = [];
+    
+    // Merge - evita duplicati per data+avversario
+    const existingKeys = new Set(current.games.map(g=>g.data+'_'+g.avversario));
+    let added = 0;
+    games.forEach(g=>{
+      const key = g.data+'_'+g.avversario;
+      if(!existingKeys.has(key)){
+        current.games.push(g);
+        added++;
+      }
+    });
+    
+    // Aggiungi stagioni
+    games.forEach(g=>{
+      if(g.stagione && !current.seasons.includes(g.stagione)){
+        current.seasons.push(g.stagione);
+      }
+    });
+    
+    if(!current.season && current.seasons.length>0){
+      current.season = current.seasons[0];
+    }
+    
+    localStorage.setItem('basket_scout_data_v1', JSON.stringify(current));
+    document.getElementById('importStatus').innerHTML = '<p class="success">✅ Importate '+added+' nuove partite (su '+games.length+' dal CSV). Totale ora: '+current.games.length+' partite.<br><br>Ricarica la nuova app installata e le vedrai!</p>';
+  }catch(e){
+    document.getElementById('importStatus').innerHTML = '<p class="error">❌ Errore: '+e.message+'</p>';
+  }
+}
+</script>
+</body>
+</html>

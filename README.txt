@@ -7,8 +7,5 @@ BASKET SCOUT v1.0 - APP INSTALLABILE
 - icon-192.png, icon-512.png, icon-180.png
 - netlify.toml (opzionale, headers Netlify)
 
-INSTALLAZIONE:
-Trascina cartella su https://app.netlify.com/drop -> link https -> Installa app
-
 AGGIORNAMENTO SENZA PERDERE DATI:
 Sostituisci solo index.html, incrementa CACHE in sw.js, ricarica su Netlify. Dati in localStorage basket_scout_data_v1 restano.

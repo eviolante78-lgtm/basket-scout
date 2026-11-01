@@ -1,4 +1,4 @@
-BASKET SCOUT v2.0 - APP INSTALLABILE
+BASKET SCOUT v1.0 - APP INSTALLABILE
 ==================================
 7 FILE:
 - index.html (app completa)

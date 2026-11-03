@@ -1,7 +1,7 @@
 # 🏀 Basket Scout - README Versione Attuale
 
-**Versione:** v1.0.1
-**Data:** 31 Ottobre 2026  
+**Versione:** v2.2.0 - Avversari + Lock per partita con SOLO LETTURA
+**Data:** 03 Novembre 2026  
 **Repo:** https://github.com/eviolante78-lgtm/basket-scout  
 **GitHub Pages:** https://eviolante78-lgtm.github.io/basket-scout/  
 **Stato:** ✅ Installabile come PWA (Android - Menu ⋮ → Installa app)
